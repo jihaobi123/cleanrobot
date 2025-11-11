@@ -1,6 +1,62 @@
 # 快速上传到 GitHub
 
-## 方法一：使用 HTTPS（推荐新手）
+## 🚀 方法一：使用 GitHub CLI（推荐，无需手动创建仓库）
+
+使用 GitHub CLI 可以直接在命令行创建仓库并上传，无需在网站上手动操作。
+
+### 1. 安装 GitHub CLI
+
+```bash
+# macOS
+brew install gh
+
+# Linux (Ubuntu/Debian)
+sudo apt install -y gh
+
+# 或使用安装脚本
+./install_github_cli.sh
+```
+
+### 2. 登录 GitHub
+
+```bash
+gh auth login
+```
+
+### 3. 一键创建并上传
+
+```bash
+# 运行自动创建和上传脚本
+./create_and_push_github.sh
+```
+
+脚本会提示输入仓库名称、描述和可见性，然后自动创建仓库并推送代码。
+
+### 4. 手动创建仓库（可选）
+
+```bash
+# 创建公开仓库
+gh repo create cleaner_robot_ws \
+  --description "ROS2 Humble cleaner robot workspace" \
+  --public \
+  --source=. \
+  --remote=origin \
+  --push
+
+# 创建私有仓库
+gh repo create cleaner_robot_ws \
+  --description "ROS2 Humble cleaner robot workspace" \
+  --private \
+  --source=. \
+  --remote=origin \
+  --push
+```
+
+**详细说明请参考: `GITHUB_CLI_GUIDE.md`**
+
+---
+
+## 方法二：使用 HTTPS（需要先在网站上创建仓库）
 
 ```bash
 # 1. 添加远程仓库（替换 YOUR_USERNAME 和 YOUR_REPO_NAME）
@@ -10,7 +66,7 @@ git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
 git push -u origin main
 ```
 
-## 方法二：使用 SSH（如果已配置 SSH 密钥）
+## 方法三：使用 SSH（如果已配置 SSH 密钥）
 
 ```bash
 # 1. 添加远程仓库（替换 YOUR_USERNAME 和 YOUR_REPO_NAME）
@@ -20,7 +76,7 @@ git remote add origin git@github.com:YOUR_USERNAME/YOUR_REPO_NAME.git
 git push -u origin main
 ```
 
-## 方法三：使用上传脚本
+## 方法四：使用上传脚本（需要先在网站上创建仓库）
 
 ```bash
 # 1. 先添加远程仓库
