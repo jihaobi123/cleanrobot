@@ -1,0 +1,17 @@
+vision_detection_node:
+  ros__parameters:
+    # 摄像头配置
+    camera_index: 0
+    fps: 30.0
+    
+    # 模型配置
+    model_path: ""  # 需要指定RKNN模型路径
+    input_width: 640
+    input_height: 640
+    conf_threshold: 0.5  # 置信度阈值
+    
+    # 话题配置
+    topic_name: "/dirty_spots"
+    image_topic: "/camera/image_raw"
+    frame_id: "camera_frame"
+

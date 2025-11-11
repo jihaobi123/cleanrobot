@@ -1,0 +1,49 @@
+# ROS2 工作空间构建目录
+build/
+install/
+log/
+
+# Python
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 日志文件
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 模型文件（大文件，建议使用Git LFS）
+*.rknn
+*.onnx
+*.pt
+*.pth
+*.weights
+
+# 临时文件
+*.tmp
+*.bak
+*.orig
+
+# 环境变量
+.env
+.env.local
+
+# 系统文件
+.DS_Store
+Thumbs.db
+

@@ -1,0 +1,21 @@
+perception_fusion_node:
+  ros__parameters:
+    # 订阅话题
+    map_topic: "/map"
+    odom_topic: "/odom"
+    detection_topic: "/dirty_spots"
+    scan_topic: "/scan"
+    
+    # 发布话题
+    task_topic: "/cleaning_task"
+    
+    # 坐标系配置
+    map_frame: "map"
+    odom_frame: "odom"
+    base_frame: "base_link"
+    camera_frame: "camera_frame"
+    
+    # 任务生成参数
+    task_threshold: 0.5  # 任务去重距离阈值(m)
+    max_tasks: 10        # 最大任务数量
+
