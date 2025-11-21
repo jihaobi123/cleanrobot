@@ -90,5 +90,16 @@ ros2 topic echo /scan
    ```
    预期至少能看到`/scan`和`/ldlidar_node/health`。
 
+### 常见问题/排查建议
+- **串口权限不足**：执行 `sudo usermod -a -G dialout $USER` 后重新登录，或临时运行 `sudo chmod a+rw /dev/ttyUSB0`。
+- **设备名称不一致**：`ls /dev/ttyUSB*` 检查实际设备名，并在 `ld14.launch.py` 中调整 `serial_port`。
+- **依赖缺失导致编译失败**：确认已执行上文的 `ros-humble-*` 依赖安装；如使用国内源，确保 apt 源已更新。
+- **RViz 无数据**：确保 `Fixed Frame` 与驱动发布的 `frame_id` 一致（默认 `laser`），并订阅 `/scan` 话题。
+
+### 使用官方驱动与本包的关系
+- 官方驱动 `ldlidar_sl_ros2` 支持 LD14/LD14P，提供完整的节点与 Launch 文件，适合开箱即用。
+- 本包侧重于示例化的自定义驱动实现，便于二次开发或学习，依赖列表与参数命名可能与官方包不同。
+- 若仅需快速集成硬件，推荐直接使用官方驱动；需要深度定制时，可参考本包代码结构与配置。
+
 更多细节参考官方仓库文档：https://gitee.com/ldrobotSensorTeam/ldlidar_sl_ros2
 
