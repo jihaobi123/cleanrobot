@@ -57,3 +57,38 @@ ros2 topic echo /scan
 2. 检查串口设备路径是否正确
 3. 确保雷达已正确连接并上电
 
+## 使用LDROBOT官方ROS2驱动（ldlidar_sl_ros2）
+如果希望直接使用LDROBOT官方提供的LD14/LD14P驱动，可参考以下步骤。官方仓库已在 **Ubuntu 22.04 + ROS2 Humble** 环境下验证，依赖和启动流程如下：
+
+1. 安装依赖
+   ```bash
+   sudo apt update
+   sudo apt install -y ros-humble-rclcpp \\
+                       ros-humble-sensor-msgs \\
+                       ros-humble-tf2 \\
+                       ros-humble-tf2-ros \\
+                       ros-humble-path-navigation-msgs
+   ```
+
+2. 克隆并构建
+   ```bash
+   cd ~/ros2_ws/src
+   git clone https://gitee.com/ldrobotSensorTeam/ldlidar_sl_ros2.git
+   cd ..
+   colcon build
+   source install/setup.bash
+   ```
+
+3. 运行LD14节点
+   ```bash
+   ros2 launch ldlidar_sl_ros2 ld14.launch.py
+   ```
+
+4. 验证话题
+   ```bash
+   ros2 topic list
+   ```
+   预期至少能看到`/scan`和`/ldlidar_node/health`。
+
+更多细节参考官方仓库文档：https://gitee.com/ldrobotSensorTeam/ldlidar_sl_ros2
+
