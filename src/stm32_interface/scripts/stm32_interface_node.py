@@ -22,6 +22,8 @@ class SerialProtocol:
     """串口通信协议"""
     
     # 帧格式: Header(0xAA55) + CMD_ID(1字节) + Payload长度(2字节) + Payload + CRC16(2字节)
+    # 其中Header用于快速定位帧起始，CMD_ID区分命令类型，Payload承载业务数据，
+    # CRC16用于校验帧完整性。
     HEADER = b'\xAA\x55'
     HEADER_SIZE = 2
     CMD_ID_SIZE = 1
@@ -54,7 +56,10 @@ class SerialProtocol:
     
     @staticmethod
     def pack_frame(cmd_id: int, payload: bytes) -> bytes:
-        """打包数据帧"""
+        """打包数据帧
+
+        将命令ID和载荷组合成协议帧，同时在尾部附加CRC16校验。
+        """
         length = len(payload)
         frame = struct.pack('>BBH', 0xAA, 0x55, cmd_id)  # Header + CMD_ID
         frame += struct.pack('<H', length)  # Payload长度（小端）
@@ -65,7 +70,10 @@ class SerialProtocol:
     
     @staticmethod
     def unpack_frame(data: bytes) -> Optional[tuple]:
-        """解包数据帧"""
+        """解包数据帧
+
+        验证包头与CRC并返回(cmd_id, payload)，错误时返回None。
+        """
         if len(data) < SerialProtocol.HEADER_SIZE + SerialProtocol.CMD_ID_SIZE + SerialProtocol.LENGTH_SIZE:
             return None
         
@@ -99,6 +107,7 @@ class SerialInterface:
         self.is_connected = False
         self.receive_thread: Optional[threading.Thread] = None
         self.receive_callback = None
+        # 接收缓冲区，用于拼接可能被拆分的串口数据帧
         self.buffer = bytearray()
     
     def connect(self) -> bool:
@@ -114,6 +123,7 @@ class SerialInterface:
             )
             self.is_connected = True
             # 启动接收线程
+            # 守护线程持续读取串口并解析帧
             self.receive_thread = threading.Thread(target=self._receive_loop, daemon=True)
             self.receive_thread.start()
             return True
@@ -145,7 +155,10 @@ class SerialInterface:
         self.receive_callback = callback
     
     def _receive_loop(self):
-        """接收数据循环"""
+        """接收数据循环
+
+        持续从串口读取数据，拼接到缓冲区后按协议切分完整帧并回调处理。
+        """
         while self.is_connected and self.serial_conn:
             try:
                 if self.serial_conn.in_waiting > 0:
@@ -155,6 +168,7 @@ class SerialInterface:
                     # 查找完整帧
                     while len(self.buffer) >= SerialProtocol.HEADER_SIZE:
                         # 查找包头
+                        # 如果缓冲区前面有脏数据则丢弃到下一个正确包头
                         header_idx = self.buffer.find(SerialProtocol.HEADER)
                         if header_idx == -1:
                             self.buffer.clear()
@@ -166,6 +180,7 @@ class SerialInterface:
                         if len(self.buffer) < SerialProtocol.HEADER_SIZE + SerialProtocol.CMD_ID_SIZE + SerialProtocol.LENGTH_SIZE:
                             break
                         
+                        # 根据长度字段计算整个帧的长度（含CRC）
                         length = struct.unpack('<H', self.buffer[3:5])[0]
                         frame_size = 5 + length + SerialProtocol.CRC_SIZE
                         
@@ -183,7 +198,10 @@ class SerialInterface:
 
 
 class UDPInterface:
-    """UDP接口"""
+    """UDP接口
+
+    用于在网络上与STM32通信，逻辑与串口类似，但无需拆分帧。
+    """
     
     def __init__(self, local_port: int, remote_addr: str, remote_port: int):
         self.local_port = local_port
@@ -199,6 +217,7 @@ class UDPInterface:
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock.bind(('', self.local_port))
+            # 设置短超时，使接收循环可以响应线程退出
             self.sock.settimeout(0.1)
             self.is_connected = True
             # 启动接收线程
