@@ -57,3 +57,49 @@ ros2 topic echo /scan
 2. 检查串口设备路径是否正确
 3. 确保雷达已正确连接并上电
 
+## 使用LDROBOT官方ROS2驱动（ldlidar_sl_ros2）
+如果希望直接使用LDROBOT官方提供的LD14/LD14P驱动，可参考以下步骤。官方仓库已在 **Ubuntu 22.04 + ROS2 Humble** 环境下验证，依赖和启动流程如下：
+
+1. 安装依赖
+   ```bash
+   sudo apt update
+   sudo apt install -y ros-humble-rclcpp \\
+                       ros-humble-sensor-msgs \\
+                       ros-humble-tf2 \\
+                       ros-humble-tf2-ros \\
+                       ros-humble-path-navigation-msgs
+   ```
+
+2. 克隆并构建
+   ```bash
+   cd ~/ros2_ws/src
+   git clone https://gitee.com/ldrobotSensorTeam/ldlidar_sl_ros2.git
+   cd ..
+   colcon build
+   source install/setup.bash
+   ```
+
+3. 运行LD14节点
+   ```bash
+   ros2 launch ldlidar_sl_ros2 ld14.launch.py
+   ```
+
+4. 验证话题
+   ```bash
+   ros2 topic list
+   ```
+   预期至少能看到`/scan`和`/ldlidar_node/health`。
+
+### 常见问题/排查建议
+- **串口权限不足**：执行 `sudo usermod -a -G dialout $USER` 后重新登录，或临时运行 `sudo chmod a+rw /dev/ttyUSB0`。
+- **设备名称不一致**：`ls /dev/ttyUSB*` 检查实际设备名，并在 `ld14.launch.py` 中调整 `serial_port`。
+- **依赖缺失导致编译失败**：确认已执行上文的 `ros-humble-*` 依赖安装；如使用国内源，确保 apt 源已更新。
+- **RViz 无数据**：确保 `Fixed Frame` 与驱动发布的 `frame_id` 一致（默认 `laser`），并订阅 `/scan` 话题。
+
+### 使用官方驱动与本包的关系
+- 官方驱动 `ldlidar_sl_ros2` 支持 LD14/LD14P，提供完整的节点与 Launch 文件，适合开箱即用。
+- 本包侧重于示例化的自定义驱动实现，便于二次开发或学习，依赖列表与参数命名可能与官方包不同。
+- 若仅需快速集成硬件，推荐直接使用官方驱动；需要深度定制时，可参考本包代码结构与配置。
+
+更多细节参考官方仓库文档：https://gitee.com/ldrobotSensorTeam/ldlidar_sl_ros2
+
