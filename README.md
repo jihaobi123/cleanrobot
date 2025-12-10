@@ -23,6 +23,16 @@ cleaner_robot_ws/
 - **发布话题**: `/scan` (sensor_msgs/msg/LaserScan)
 - **配置**: 支持串口设备、波特率、坐标系等参数配置
 
+### 1.5 cleanrobot_slam
+- **功能**: 启动LD14激光雷达与 slam_toolbox online_async 模式，实现 2D 建图
+- **订阅话题**: `/scan` (sensor_msgs/msg/LaserScan, frame `base_laser`)
+- **配置**: `cleanrobot_slam/config/slam_params.yaml`
+
+### 1.6 cleanrobot_nav
+- **功能**: 基于 Nav2 的导航启动包，加载本仓库的导航参数
+- **订阅/发布**: 订阅 `/scan`、`/odom`，发布 `/cmd_vel`
+- **配置**: `cleanrobot_nav/config/nav2_params.yaml`
+
 ### 2. vision_detection
 - **功能**: 使用USB摄像头采集图像，通过YOLOv8 RKNN模型在NPU上推理识别脏污
 - **发布话题**: 
@@ -110,6 +120,31 @@ ros2 launch stm32_interface stm32_interface.launch.py
 ```bash
 ros2 launch cleaner_robot_bringup cleaner_robot.launch.py
 ```
+
+### 方式3: SLAM 建图与地图保存
+
+```bash
+# 终端1: 启动雷达 + slam_toolbox（online_async 模式，LaserScan frame 为 base_laser）
+ros2 launch cleanrobot_slam ld14_slam.launch.py
+
+# 终端2: 保存地图
+ros2 run nav2_map_server map_saver_cli --ros-args -p save_map_timeout:=5.0 -p free_thresh_default:=0.25 -p occupied_thresh_default:=0.65 -p map_topic:=/map -p output_file:=~/maps/cleanrobot_map
+```
+
+### 导航启动步骤
+
+1. 启动雷达 + SLAM 建图（如果已有地图可跳过）：
+   ```bash
+   ros2 launch cleanrobot_slam ld14_slam.launch.py
+   ```
+2. 保存地图：
+   ```bash
+   ros2 run nav2_map_server map_saver_cli --ros-args -p map_topic:=/map -p output_file:=~/maps/cleanrobot_map
+   ```
+3. 使用保存好的地图启动 Nav2：
+   ```bash
+   ros2 launch cleanrobot_nav bringup.launch.py map:=~/maps/cleanrobot_map.yaml
+   ```
 
 ## 配置说明
 

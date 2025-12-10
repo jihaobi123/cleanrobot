@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>cleanrobot_nav</name>
+  <version>0.0.1</version>
+  <description>Navigation bringup package for Cleaner Robot using Nav2.</description>
+  <maintainer email="maintainer@example.com">Cleaner Robot</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>nav2_bringup</build_depend>
+
+  <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>nav2_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

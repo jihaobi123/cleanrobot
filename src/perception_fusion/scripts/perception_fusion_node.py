@@ -27,6 +27,8 @@ class PerceptionFusionNode(Node):
         super().__init__('perception_fusion_node')
         
         # 声明参数
+        # 每个参数都允许在launch文件或动态参数中配置，用于适配不同的
+        # 机器人坐标系、话题名称以及任务生成策略。
         self.declare_parameter('map_topic', '/map')
         self.declare_parameter('odom_topic', '/odom')
         self.declare_parameter('detection_topic', '/dirty_spots')
@@ -53,10 +55,13 @@ class PerceptionFusionNode(Node):
         self.max_tasks = self.get_parameter('max_tasks').get_parameter_value().integer_value
         
         # 初始化TF监听器
+        # TF Buffer负责缓存各个坐标系之间的变换，TransformListener持续监听
+        # TF树并填充Buffer，后续的坐标转换都依赖于此。
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         
         # 数据存储
+        # 这些成员变量保存最新收到的传感器与检测数据，便于融合时直接取用。
         self.current_map: Optional[OccupancyGrid] = None
         self.current_odom: Optional[Odometry] = None
         self.current_detections: Optional[Detection2DArray] = None
@@ -64,10 +69,13 @@ class PerceptionFusionNode(Node):
         self.robot_pose: Optional[PoseStamped] = None
         
         # 任务管理
+        # task_list缓存尚未完成的清洁任务，task_id_counter用来给任务
+        # 分配递增的唯一ID。
         self.task_list: List[CleanTask] = []
         self.task_id_counter = 0
         
         # 创建订阅者
+        # 订阅地图、里程计、视觉检测结果和激光雷达数据，用于后续融合。
         self.map_sub = self.create_subscription(
             OccupancyGrid, map_topic, self.map_callback, 10
         )
@@ -82,9 +90,11 @@ class PerceptionFusionNode(Node):
         )
         
         # 创建发布者
+        # 将生成的清洁任务列表通过task_topic发布给下游执行节点。
         self.task_publisher = self.create_publisher(CleaningTaskList, task_topic, 10)
         
         # 创建定时器，定期处理任务
+        # 每秒执行一次process_tasks，用最新的检测结果生成或更新任务。
         self.timer = self.create_timer(1.0, self.process_tasks)
         
         self.get_logger().info('感知融合节点已启动')
@@ -100,6 +110,8 @@ class PerceptionFusionNode(Node):
         """里程计回调"""
         self.current_odom = msg
         # 更新机器人位姿
+        # 通过TF获取map->base_link变换，将其转换为PoseStamped保存，便于
+        # 后续把相机坐标系中的点转换到地图坐标系。
         try:
             transform = self.tf_buffer.lookup_transform(
                 self.map_frame,
@@ -144,8 +156,8 @@ class PerceptionFusionNode(Node):
             self.get_logger().warn(f'无法获取相机变换: {str(e)}')
             return None
         
-        # 简化处理：假设相机视角为60度，检测区域在机器人前方一定距离
-        # 实际应用中需要使用相机内参和深度信息
+        # 简化处理：假设相机视角为60度，检测区域在机器人前方一定距离。
+        # 实际应用中需要使用相机内参和深度信息通过投影模型计算深度。
         camera_fov = math.radians(60.0)  # 相机视场角
         detection_distance = 1.0  # 假设检测距离1米
         
@@ -187,11 +199,13 @@ class PerceptionFusionNode(Node):
             return
         
         # 处理新的检测结果
+        # 每次定时器触发时遍历检测框，尝试为每个脏污检测生成任务。
         for detection in self.current_detections.detections:
             if len(detection.results) == 0:
                 continue
             
             # 获取检测框中心
+            # 仅使用中心像素来估计脏污点的方向与位置。
             bbox = detection.bbox
             pixel_x = bbox.center.position.x
             pixel_y = bbox.center.position.y
@@ -206,6 +220,7 @@ class PerceptionFusionNode(Node):
                 image_height = 480
             
             # 转换为地图坐标
+            # 先将像素坐标转换到相机坐标系，再通过TF得到地图坐标。
             map_point = self.pixel_to_map_coordinate(
                 pixel_x, pixel_y, image_width, image_height
             )
@@ -214,6 +229,7 @@ class PerceptionFusionNode(Node):
                 continue
             
             # 检查是否已存在相近任务
+            # 若已有距离很近的任务则跳过，避免重复下发。
             task_exists = False
             for existing_task in self.task_list:
                 dx = map_point.x - existing_task.target_position.x
@@ -225,6 +241,7 @@ class PerceptionFusionNode(Node):
                     break
             
             # 如果不存在相近任务，创建新任务
+            # 优先级根据检测置信度映射到0-255，超过阈值的使用深度清洁模式。
             if not task_exists and len(self.task_list) < self.max_tasks:
                 # 根据检测置信度设置优先级
                 confidence = detection.results[0].score
@@ -240,9 +257,11 @@ class PerceptionFusionNode(Node):
                 )
         
         # 清理已完成的任务
+        # 状态>=2视为已完成或取消，从任务列表中移除。
         self.task_list = [task for task in self.task_list if task.status < 2]
         
         # 发布任务列表
+        # 按列表形式发布当前待执行任务，供执行器订阅。
         if len(self.task_list) > 0:
             task_list_msg = CleaningTaskList()
             task_list_msg.tasks = self.task_list
