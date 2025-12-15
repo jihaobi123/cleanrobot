@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>cleanrobot_bringup</name>
+  <version>0.0.1</version>
+  <description>Bringup stack for CleanRobot: lidar, IMU, rf2o odometry, EKF, SLAM, and RViz.</description>
+  <maintainer email="maintainer@example.com">CleanRobot Maintainer</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>slam_toolbox</exec_depend>
+  <exec_depend>robot_localization</exec_depend>
+  <exec_depend>rf2o_laser_odometry</exec_depend>
+  <exec_depend>ldlidar</exec_depend>
+  <exec_depend>imu_ros2_device</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+</package>
