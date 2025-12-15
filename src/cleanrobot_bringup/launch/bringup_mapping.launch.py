@@ -94,7 +94,13 @@ def generate_launch_description():
         executable='async_slam_toolbox_node',
         name='slam_toolbox',
         output='screen',
-        parameters=[slam_params]
+        parameters=[
+        slam_params,
+        {
+            'map_update_interval': 1.0,   # 改成 1 秒更新一次（你也可以 0.5）
+            'throttle_scans': 1,
+        }
+        ]
     )
 
     # ================= RViz =================
@@ -142,8 +148,4 @@ def generate_launch_description():
         # viz
         rviz_node,
 
-        # ===== 延迟 5 秒启动 TF 监视 =====
-        TimerAction(period=5.0, actions=[tf_echo_map_odom]),
-        TimerAction(period=5.0, actions=[tf_echo_odom_base]),
-        TimerAction(period=5.0, actions=[tf_echo_base_laser]),
     ])
