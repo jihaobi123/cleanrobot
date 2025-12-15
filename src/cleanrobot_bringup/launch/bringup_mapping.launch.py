@@ -15,33 +15,44 @@ def generate_launch_description():
     bringup_share = get_package_share_directory('cleanrobot_bringup')
     rviz_config = os.path.join(bringup_share, 'rviz', 'bringup.rviz')
 
-    # ========= 关键：参数文件统一从工作空间根目录 cleanrobot/config/ 读取 =========
-    # 假设你的工作空间结构是：~/文档/cleanrobot/cleanrobot/config/xxx.yaml
-    # 即 bringup_share = .../install/cleanrobot_bringup/share/cleanrobot_bringup
-    # 向上回到 workspace 根目录再进入 config
+    # ========= 参数文件统一从工作空间根目录 cleanrobot/config/ 读取 =========
+    # 假设：~/文档/cleanrobot/cleanrobot/config/xxx.yaml
     ws_root = os.path.abspath(os.path.join(bringup_share, '..', '..', '..', '..'))
     config_dir = os.path.join(ws_root, 'config')
 
-    slam_params = os.path.join(config_dir, 'ld14_slam.yaml')   # 你说的 SLAM 参数文件
+    slam_params = os.path.join(config_dir, 'ld14_slam.yaml')
     ekf_params  = os.path.join(config_dir, 'ekf.yaml')
     rf2o_params = os.path.join(config_dir, 'rf2o.yaml')
 
-    # LiDAR
+    # ========= LiDAR =========
     ldlidar_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory('ldlidar'), 'launch', 'ld14p.launch.py')
         )
     )
 
-    # IMU：禁用 RViz（避免一启动一堆窗口/冲突）
-    imu_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(get_package_share_directory('imu_ros2_device'), 'launch', 'ybimu_display.launch.py')
-        ),
-        launch_arguments={
-            'rviz': 'false',
-            'start_driver': 'true',
-        }.items()
+    # ========= IMU：改为“最小必要集合”，避免 ybimu_display.launch.py 重复启动 madgwick =========
+    # 1) IMU driver
+    imu_driver = Node(
+        package='imu_ros2_device',
+        executable='ybimu_driver',
+        name='ybimu_driver',
+        output='screen'
+    )
+
+    # 2) Madgwick filter（只输出 IMU 数据给 EKF，用静态 TF，不让它发布 TF）
+    imu_pkg_share = get_package_share_directory('imu_ros2_device')
+    imu_filter_param = os.path.join(imu_pkg_share, 'config', 'imu_filter_param.yaml')
+
+    imu_filter = Node(
+        package='imu_filter_madgwick',
+        executable='imu_filter_madgwick_node',
+        name='imu_filter_madgwick_node',
+        output='screen',
+        parameters=[
+            imu_filter_param,
+            {'publish_tf': False}
+        ]
     )
 
     # base_link -> imu_link 静态 TF（如果你 IMU 安装位姿不是 0，再改这里的 xyz/rpy）
@@ -53,7 +64,7 @@ def generate_launch_description():
         output='screen'
     )
 
-    # RF2O（参数固定在 rf2o.yaml 里，里面记得包含 init_pose_from_topic: ""）
+    # ========= RF2O =========
     rf2o_node = Node(
         package='rf2o_laser_odometry',
         executable='rf2o_laser_odometry_node',
@@ -62,7 +73,7 @@ def generate_launch_description():
         parameters=[rf2o_params],
     )
 
-    # EKF
+    # ========= EKF =========
     ekf_node = Node(
         package='robot_localization',
         executable='ekf_node',
@@ -71,7 +82,7 @@ def generate_launch_description():
         parameters=[ekf_params]
     )
 
-    # SLAM Toolbox
+    # ========= SLAM Toolbox =========
     slam_node = Node(
         package='slam_toolbox',
         executable='async_slam_toolbox_node',
@@ -80,7 +91,7 @@ def generate_launch_description():
         parameters=[slam_params]
     )
 
-    # RViz（总 RViz，只开这一个）
+    # ========= RViz（总 RViz，只开这一个） =========
     rviz_node = Node(
         condition=IfCondition(use_rviz),
         package='rviz2',
@@ -92,12 +103,20 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument('rviz', default_value='true'),
+
+        # sensors
         ldlidar_launch,
-        imu_launch,
+        imu_driver,
+        imu_filter,
+
+        # static TF
         static_tf_imu,
+
+        # odom / fusion / slam
         rf2o_node,
         ekf_node,
         slam_node,
+
+        # viz
         rviz_node,
     ])
-
