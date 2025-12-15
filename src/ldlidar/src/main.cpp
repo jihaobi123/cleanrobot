@@ -20,6 +20,7 @@
  */
 #include "ros2_api.h"
 #include "lipkg.h"
+#include "rclcpp/rclcpp.hpp"
 
 int angle_mulmin[]={135};  //雷达屏蔽角度，这里屏蔽角度为135°到225°，
                         //如果要多角度屏蔽，如10~30，50~60，改为：angle_mulmin[]={10，50};angle_mulmax[]={30，60};
@@ -125,7 +126,8 @@ int main(int argc, char **argv) {
 
   // create ldlidar data topic and publisher
   rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr publisher = 
-    node->create_publisher<sensor_msgs::msg::LaserScan>(topic_name, 10);
+    node->create_publisher<sensor_msgs::msg::LaserScan>(topic_name, rclcpp::SensorDataQoS());
+
 
   rclcpp::WallRate r(6); //Hz
 
