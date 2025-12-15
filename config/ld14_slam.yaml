@@ -4,23 +4,25 @@ slam_toolbox:
 
     map_frame: map
     odom_frame: odom
-    base_frame: base_laser
+    base_frame: base_link   # 强烈建议用 base_link，不用 base_laser
 
     scan_topic: /scan
     mode: mapping
 
-    resolution: 0.10
-    max_laser_range: 4.0
+    resolution: 0.05
+    max_laser_range: 10.0
 
-    # 让它更容易更新（你现在 0.1 太大）
-    minimum_travel_distance: 0.02
-    minimum_travel_heading: 0.02
+    # 不要太小，避免抖动
+    minimum_travel_distance: 0.05
+    minimum_travel_heading: 0.05
 
-    # 关键：减少 TF 来不及导致的丢帧
-    scan_queue_size: 200
-    transform_timeout: 1.0
-    tf_buffer_duration: 120.0
+    # 地图更新频率（稳定）
+    map_update_interval: 1.0
+    throttle_scans: 1
 
-    # 发布 map->odom TF
+    # TF
+    transform_timeout: 0.5
+    tf_buffer_duration: 60.0
+
     publish_tf: true
     transform_publish_period: 0.05
