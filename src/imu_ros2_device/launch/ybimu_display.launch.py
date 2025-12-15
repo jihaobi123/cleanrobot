@@ -2,6 +2,7 @@ from ament_index_python.packages import get_package_share_path, get_package_shar
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 
 from launch_ros.actions import Node
@@ -16,6 +17,18 @@ def generate_launch_description():
     default_rviz_config_path = package_path / 'rviz/ybimu.rviz'
     print("config path:", default_rviz_config_path)
 
+    start_driver_arg = DeclareLaunchArgument(
+        name='start_driver',
+        default_value='true',
+        description='Whether to start ybimu_driver node'
+    )
+
+    rviz_enable_arg = DeclareLaunchArgument(
+        name='rviz',
+        default_value='true',
+        description='Whether to launch RViz2'
+    )
+
     rviz_arg = DeclareLaunchArgument(
         name='rvizconfig',
         default_value=str(default_rviz_config_path),
@@ -28,17 +41,18 @@ def generate_launch_description():
         name='rviz2',
         output='screen',
         arguments=['-d', LaunchConfiguration('rvizconfig')],
+        condition=IfCondition(LaunchConfiguration('rviz')),
     )
 
-    # 🔽🔽🔽 先不要在 launch 里启动驱动节点，避免重复发布 /imu/data_raw
-    # device_node = Node(
-    #     package='imu_ros2_device',
-    #     executable='ybimu_driver',
-    #     name='ybimu_driver',
-    #     remappings=[
-    #         ('/imu/data', '/imu/data_raw'),
-    #     ],
-    # )
+    device_node = Node(
+        package='imu_ros2_device',
+        executable='ybimu_driver',
+        name='ybimu_driver',
+        remappings=[
+            ('/imu/data', '/imu/data_raw'),
+        ],
+        condition=IfCondition(LaunchConfiguration('start_driver')),
+    )
 
     imu_filter_config = os.path.join(
         get_package_share_directory('imu_ros2_device'),
@@ -55,8 +69,10 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        start_driver_arg,
+        rviz_enable_arg,
         rviz_arg,
+        device_node,
         rviz_node,
-        # device_node,  # 🔽🔽🔽 注释掉，不再由 launch 启动驱动
         imu_filter_node,
     ])

@@ -71,9 +71,10 @@ class ybimu_driver(Node):
         # Publish gyroscope data
         imu.header.stamp = time_stamp.to_msg()
         imu.header.frame_id = "imu_link"
-        imu.linear_acceleration.x = ax * 1.0
-        imu.linear_acceleration.y = ay * 1.0
-        imu.linear_acceleration.z = az * 1.0
+        g_to_ms2 = 9.80665  # convert g to m/s^2 for linear acceleration
+        imu.linear_acceleration.x = ax * g_to_ms2
+        imu.linear_acceleration.y = ay * g_to_ms2
+        imu.linear_acceleration.z = az * g_to_ms2
         imu.angular_velocity.x = gx * 1.0
         imu.angular_velocity.y = gy * 1.0
         imu.angular_velocity.z = gz * 1.0
