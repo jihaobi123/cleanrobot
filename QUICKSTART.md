@@ -54,12 +54,7 @@ conf_threshold: 0.5
 ```
 
 ### STM32接口配置
-编辑 `src/stm32_interface/config/stm32_interface.yaml`:
-```yaml
-communication_type: "serial"  # 或 "udp"
-serial_port: "/dev/ttyUSB1"  # 根据实际设备修改
-serial_baud_rate: 115200
-```
+默认参数已经写在 launch 里（/dev/ttyUSB0, 115200, 20Hz, 0.3s 超时），通常无需额外配置。若需修改，可在启动时覆盖 launch 参数。
 
 ## 5. 运行节点
 
@@ -80,7 +75,15 @@ ros2 launch vision_detection vision_detection.launch.py
 ros2 launch perception_fusion perception_fusion.launch.py
 
 # 终端4: STM32接口
-ros2 launch stm32_interface stm32_interface.launch.py
+ros2 launch stm32_interface stm32_bridge.launch.py
+```
+
+### 导航（已有地图）
+```bash
+# 使用默认地图 cleanrobot_nav/maps/cleanrobot_map.yaml
+ros2 launch cleanrobot_nav bringup.launch.py
+# 如需临时替换地图
+ros2 launch cleanrobot_nav bringup.launch.py map:=/home/cat/maps/other_map.yaml
 ```
 
 ## 6. 查看数据

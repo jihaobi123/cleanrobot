@@ -58,16 +58,16 @@ cleaner_robot_ws/
 │   │   └── config/
 │   │       └── perception_fusion.yaml
 │   │
-│   ├── stm32_interface/         # STM32接口包
+│   ├── stm32_interface/         # STM32串口桥（/cmd_vel）
 │   │   ├── package.xml
-│   │   ├── CMakeLists.txt
+│   │   ├── setup.py / setup.cfg
 │   │   ├── README.md
-│   │   ├── scripts/
-│   │   │   └── stm32_interface_node.py
-│   │   ├── launch/
-│   │   │   └── stm32_interface.launch.py
-│   │   └── config/
-│   │       └── stm32_interface.yaml
+│   │   ├── resource/
+│   │   │   └── stm32_interface
+│   │   ├── stm32_interface/
+│   │   │   └── cmd_vel_to_stm32.py
+│   │   └── launch/
+│   │       └── stm32_bridge.launch.py
 │   │
 │   └── cleaner_robot_bringup/   # 统一启动包
 │       ├── package.xml
@@ -109,13 +109,12 @@ cleaner_robot_ws/
   - `perception_fusion.yaml`: 配置参数
   - `perception_fusion.launch.py`: 启动文件
 
-### 4. stm32_interface (CMake包)
-- **类型**: ament_cmake
-- **功能**: STM32通信接口
+### 4. stm32_interface (Python包)
+- **类型**: ament_python
+- **功能**: `/cmd_vel` → STM32 串口桥（AA55帧 + CRC16）
 - **主要文件**:
-  - `stm32_interface_node.py`: 主节点实现
-  - `stm32_interface.yaml`: 配置参数
-  - `stm32_interface.launch.py`: 启动文件
+  - `cmd_vel_to_stm32.py`: 订阅 `/cmd_vel`，串口下发速度
+  - `stm32_bridge.launch.py`: 默认参数的启动文件
 
 ### 5. cleaner_robot_bringup (CMake包)
 - **类型**: ament_cmake

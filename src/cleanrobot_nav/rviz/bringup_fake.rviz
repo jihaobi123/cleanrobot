@@ -1,0 +1,48 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Name: TF
+      Show Arrows: false
+      Show Axes: true
+      Tree: {}
+    - Class: rviz_default_plugins/Map
+      Enabled: true
+      Name: Map
+      Topic: /map
+    - Class: rviz_default_plugins/Odometry
+      Enabled: true
+      Name: Odom
+      Topic: /odom
+      Shape: Arrow
+    - Class: rviz_default_plugins/RobotModel
+      Enabled: true
+      Name: RobotModel
+      Description Topic: /robot_description
+    - Class: rviz_default_plugins/Path
+      Enabled: true
+      Name: GlobalPath
+      Topic: /plan
+    - Class: rviz_default_plugins/Path
+      Enabled: true
+      Name: LocalPath
+      Topic: /local_plan
+  Global Options:
+    Fixed Frame: map
+    Background Color: 0; 0; 0
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 5.0
+      Pitch: 0.785
+      Yaw: 0.785
+Window Geometry:
+  Width: 1280
+  Height: 720
+

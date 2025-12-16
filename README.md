@@ -32,6 +32,8 @@ cleaner_robot_ws/
 - **功能**: 基于 Nav2 的导航启动包，加载本仓库的导航参数
 - **订阅/发布**: 订阅 `/scan`、`/odom`，发布 `/cmd_vel`
 - **配置**: `cleanrobot_nav/config/nav2_params.yaml`
+- **默认地图**: `cleanrobot_nav/maps/cleanrobot_map.yaml`
+- **入口**: `ros2 launch cleanrobot_nav bringup.launch.py`（可用 `map:=...` 覆盖）
 
 ### 2. vision_detection
 - **功能**: 使用USB摄像头采集图像，通过YOLOv8 RKNN模型在NPU上推理识别脏污
@@ -51,10 +53,10 @@ cleaner_robot_ws/
 - **自定义消息**: CleanTask.msg, CleaningTaskList.msg
 
 ### 4. stm32_interface
-- **功能**: 与STM32下位机通信，发送清洁任务指令，接收反馈
-- **订阅话题**: `/cleaning_task` (perception_fusion/msg/CleaningTaskList)
-- **发布话题**: `/stm32_status` (std_msgs/msg/String)
-- **通信方式**: 支持串口和UDP两种通信方式
+- **功能**: `/cmd_vel` → STM32 串口桥（AA55 + CRC16，20Hz，0.3s 看门狗）
+- **订阅话题**: `/cmd_vel` (geometry_msgs/msg/Twist)
+- **发布话题**: （可选上行后续扩展）
+- **启动**: `ros2 launch stm32_interface stm32_bridge.launch.py`
 
 ## 环境要求
 
@@ -112,7 +114,7 @@ ros2 launch vision_detection vision_detection.launch.py
 ros2 launch perception_fusion perception_fusion.launch.py
 
 # 终端4: 启动STM32接口
-ros2 launch stm32_interface stm32_interface.launch.py
+ros2 launch stm32_interface stm32_bridge.launch.py
 ```
 
 ### 方式2: 使用统一启动文件（需要创建）
@@ -141,8 +143,10 @@ ros2 run nav2_map_server map_saver_cli --ros-args -p save_map_timeout:=5.0 -p fr
    ```bash
    ros2 run nav2_map_server map_saver_cli --ros-args -p map_topic:=/map -p output_file:=~/maps/cleanrobot_map
    ```
-3. 使用保存好的地图启动 Nav2：
+3. 使用保存好的地图启动 Nav2（已内置默认地图，可覆盖 map:=...）：
    ```bash
+   ros2 launch cleanrobot_nav bringup.launch.py
+   # 或临时指定其他地图
    ros2 launch cleanrobot_nav bringup.launch.py map:=~/maps/cleanrobot_map.yaml
    ```
 
@@ -152,7 +156,7 @@ ros2 run nav2_map_server map_saver_cli --ros-args -p save_map_timeout:=5.0 -p fr
 - `lidar_driver/config/lidar_driver.yaml`
 - `vision_detection/config/vision_detection.yaml`
 - `perception_fusion/config/perception_fusion.yaml`
-- `stm32_interface/config/stm32_interface.yaml`
+- `stm32_interface/launch/stm32_bridge.launch.py`（可在启动时覆盖串口参数）
 
 ## 话题列表
 
@@ -161,11 +165,11 @@ ros2 run nav2_map_server map_saver_cli --ros-args -p save_map_timeout:=5.0 -p fr
 - `/camera/image_raw` - 摄像头图像
 - `/dirty_spots` - 脏污检测结果
 - `/cleaning_task` - 清洁任务列表
-- `/stm32_status` - STM32状态反馈
 
 ### 订阅话题
 - `/map` - SLAM地图（需要SLAM节点提供）
 - `/odom` - 里程计信息（需要导航节点提供）
+- `/cmd_vel` - 底盘速度指令（Nav2 / 手动控制）
 
 ## TF树结构
 
