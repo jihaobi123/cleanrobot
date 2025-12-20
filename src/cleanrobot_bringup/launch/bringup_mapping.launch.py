@@ -1,10 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import (
-    DeclareLaunchArgument,
-    IncludeLaunchDescription,
-    ExecuteProcess,
-    TimerAction,
-)
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -15,6 +10,7 @@ import os
 
 def generate_launch_description():
     use_rviz = LaunchConfiguration('rviz')
+    use_slam = LaunchConfiguration('use_slam')
 
     # ================= 路径 =================
     bringup_share = get_package_share_directory('cleanrobot_bringup')
@@ -47,9 +43,7 @@ def generate_launch_description():
     )
 
     imu_pkg_share = get_package_share_directory('imu_ros2_device')
-    imu_filter_param = os.path.join(
-        imu_pkg_share, 'config', 'imu_filter_param.yaml'
-    )
+    imu_filter_param = os.path.join(imu_pkg_share, 'config', 'imu_filter_param.yaml')
 
     imu_filter = Node(
         package='imu_filter_madgwick',
@@ -89,19 +83,20 @@ def generate_launch_description():
         remappings=[('/odometry/filtered', '/odom')]
     )
 
-    # ================= SLAM =================
+    # ================= SLAM（可选） =================
     slam_node = Node(
         package='slam_toolbox',
         executable='async_slam_toolbox_node',
         name='slam_toolbox',
         output='screen',
         parameters=[
-        slam_params,
-        {
-            'map_update_interval': 1.0,   # 改成 1 秒更新一次（你也可以 0.5）
-            'throttle_scans': 1,
-        }
-        ]
+            slam_params,
+            {
+                'map_update_interval': 1.0,
+                'throttle_scans': 1,
+            }
+        ],
+        condition=IfCondition(use_slam)
     )
 
     # ================= RViz =================
@@ -114,39 +109,19 @@ def generate_launch_description():
         output='screen'
     )
 
-    # ================= TF 调试（延迟启动） =================
-    tf_echo_map_odom = ExecuteProcess(
-        cmd=['ros2', 'run', 'tf2_ros', 'tf2_echo', 'map', 'odom'],
-        output='screen'
-    )
-
-    tf_echo_odom_base = ExecuteProcess(
-        cmd=['ros2', 'run', 'tf2_ros', 'tf2_echo', 'odom', 'base_link'],
-        output='screen'
-    )
-
-    tf_echo_base_laser = ExecuteProcess(
-        cmd=['ros2', 'run', 'tf2_ros', 'tf2_echo', 'base_link', 'base_laser'],
-        output='screen'
-    )
-
     return LaunchDescription([
         DeclareLaunchArgument('rviz', default_value='true'),
+        DeclareLaunchArgument('use_slam', default_value='true',
+                              description='Start slam_toolbox (publish /map). Set false for offline map mode.'),
 
-        # sensors
         ldlidar_launch,
         imu_driver,
         imu_filter,
-
-        # static TF
         static_tf_imu,
 
-        # odom / fusion / slam
         rf2o_node,
         ekf_node,
+
         slam_node,
-
-        # viz
         rviz_node,
-
     ])
