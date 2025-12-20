@@ -36,7 +36,7 @@ controller_server:
       decel_lim_x: -0.6
       decel_lim_theta: -1.2
 
-      # 采样增强一点，减少“全都不可行”
+      # 采样增强一点，减少"全都不可行"
       vx_samples: 20
       vtheta_samples: 40
       sim_time: 2.0
@@ -108,7 +108,7 @@ velocity_smoother:
 
 
 # -------------------------
-# Costmaps (关键修复点)
+# Costmaps (仿真无激光版本)
 # -------------------------
 local_costmap:
   local_costmap:
@@ -118,25 +118,28 @@ local_costmap:
       global_frame: odom
       robot_base_frame: base_link
       rolling_window: true
-      width: 3          # int，避免类型坑
-      height: 3         # int，避免类型坑
+      width: 3
+      height: 3
       resolution: 0.05
 
       update_frequency: 10.0
       publish_frequency: 5.0
 
-      # 给 DWB 一个明确的机器人尺寸（不然容易全碰撞/不可行）
       robot_radius: 0.15
 
+      # ✅ 只用静态地图层 + 膨胀层（不需要 /scan）
       plugins: ["static_layer", "inflation_layer"]
 
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
+        # ✅ 关键：保证 map_server 的 latched 地图能立刻被订到
+        map_subscribe_transient_local: True
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.35
-        cost_scaling_factor: 3.0
+        # ✅ 仿真先小一点，避免通道被胀没导致 planner 失败
+        inflation_radius: 0.10
+        cost_scaling_factor: 5.0
 
 
 global_costmap:
@@ -157,8 +160,9 @@ global_costmap:
 
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.35
-        cost_scaling_factor: 3.0
+        inflation_radius: 0.10
+        cost_scaling_factor: 5.0

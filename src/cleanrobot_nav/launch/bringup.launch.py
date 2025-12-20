@@ -18,7 +18,6 @@ def _read_pgm_size(pgm_path: str):
         if magic not in [b'P2', b'P5']:
             raise RuntimeError(f"Unsupported PGM magic: {magic!r} in {pgm_path}")
 
-        # Collect tokens (skip comments/blank lines) until we have: w h maxval
         tokens = []
         while len(tokens) < 3:
             line = f.readline()
@@ -27,7 +26,6 @@ def _read_pgm_size(pgm_path: str):
             line = line.strip()
             if not line or line.startswith(b'#'):
                 continue
-            # inline comments
             if b'#' in line:
                 line = line.split(b'#', 1)[0].strip()
                 if not line:
@@ -76,29 +74,29 @@ def _compute_map_center(map_yaml_path: str):
 def _add_dynamic_static_tf(context, *args, **kwargs):
     """
     Publish a static TF map->odom for "no_localization" mode.
-
-    To place the robot near the map center at start (odom at 0,0),
-    set: map->odom = (-center_x, -center_y).
+    
+    Priority: use start_x/start_y if provided, otherwise compute map center.
     """
-    map_yaml_path = LaunchConfiguration('map').perform(context)
+    start_x = float(LaunchConfiguration('start_x').perform(context))
+    start_y = float(LaunchConfiguration('start_y').perform(context))
+    start_yaw = float(LaunchConfiguration('start_yaw').perform(context))
 
-    center_x, center_y = 0.0, 0.0
-    try:
-        center_x, center_y = _compute_map_center(map_yaml_path)
-    except Exception as e:
-        print(f"[bringup.launch.py] WARN: failed to compute map center from {map_yaml_path}: {e}")
-        print("[bringup.launch.py] WARN: fallback center = (0.0,0.0)")
+    # 只有当 start_x/start_y 都是 0 时才计算地图中心
+    if abs(start_x) < 1e-9 and abs(start_y) < 1e-9:
+        map_yaml_path = LaunchConfiguration('map').perform(context)
+        try:
+            cx, cy = _compute_map_center(map_yaml_path)
+            start_x, start_y = cx, cy
+        except Exception as e:
+            print(f"[bringup.launch.py] WARN: failed to compute map center: {e}")
 
-    tx = -float(center_x)
-    ty = -float(center_y)
-
-    print(f"[bringup.launch.py] map->odom static TF = ({tx:.3f}, {ty:.3f}, 0) yaw=0")
+    print(f"[bringup.launch.py] map->odom static TF = ({start_x:.3f}, {start_y:.3f}, 0) yaw={start_yaw:.3f}")
 
     static_map_odom = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        name='static_map_to_odom_center',
-        arguments=[f'{tx}', f'{ty}', '0', '0', '0', '0', 'map', 'odom'],
+        name='static_map_to_odom_start',
+        arguments=[f'{start_x}', f'{start_y}', '0', '0', '0', f'{start_yaw}', 'map', 'odom'],
         output='screen'
     )
     return [static_map_odom]
@@ -142,11 +140,35 @@ def generate_launch_description():
         description='Whether to use AMCL localization (map->odom). If false, use static map->odom.'
     )
 
-    # ✅ 新增：是否启动 map_server（离线地图 / no_localization 模式必须要）
     use_map_server_arg = DeclareLaunchArgument(
         'use_map_server',
         default_value='true',
         description='Whether to start nav2_map_server in no_localization mode'
+    )
+
+    # ✅ 新增：是否自动跑 coverage（仿真用 true，真机一般 false）
+    auto_coverage_arg = DeclareLaunchArgument(
+        'auto_coverage',
+        default_value='false',
+        description='Auto send coverage NavigateThroughPoses goal when launch'
+    )
+
+    start_x_arg = DeclareLaunchArgument(
+        'start_x',
+        default_value='0.0',
+        description='Starting x position for map->odom TF (0.0 = use map center)'
+    )
+
+    start_y_arg = DeclareLaunchArgument(
+        'start_y',
+        default_value='0.0',
+        description='Starting y position for map->odom TF (0.0 = use map center)'
+    )
+
+    start_yaw_arg = DeclareLaunchArgument(
+        'start_yaw',
+        default_value='0.0',
+        description='Starting yaw angle for map->odom TF (radians)'
     )
 
     params_file = LaunchConfiguration('nav2_params')
@@ -229,7 +251,7 @@ def generate_launch_description():
         condition=map_server_needed_cond
     )
 
-    # ===== Coverage waypoints node =====
+    # ===== Coverage waypoints node（默认不自动跑，用 auto_coverage 控制）=====
     coverage_node = Node(
         package='cleanrobot_nav',
         executable='coverage_waypoints.py',
@@ -238,7 +260,8 @@ def generate_launch_description():
         parameters=[{
             'step_m': 0.25,
             'keepout_cells': 1
-        }]
+        }],
+        condition=IfCondition(LaunchConfiguration('auto_coverage'))
     )
 
     # ===== Fake robot (optional) =====
@@ -259,6 +282,8 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('use_fake_base'))
     )
 
+    # ✅ fake_base：不要 remap（它本身就订阅 /cmd_vel 与 /cmd_vel_nav）
+    # 关键：优先用 /cmd_vel_nav（绕开 velocity_smoother）
     fake_base_node = Node(
         package='cleanrobot_nav',
         executable='fake_base.py',
@@ -268,11 +293,18 @@ def generate_launch_description():
             'initial_x': 0.0,
             'initial_y': 0.0,
             'initial_yaw': 0.0,
-            'use_sim_time': False
+            'deadband_vx': 0.0,
+            'deadband_wz': 0.0,
+
+            # ✅ 关键：优先用 /cmd_vel_nav（绕开 velocity_smoother）
+            'prefer_nav_cmd': True,
+            'cmd_vel_nav_topic': '/cmd_vel_nav',
+            'cmd_vel_topic': '/cmd_vel',
+
+            'odom_topic': '/odom',
+            'odom_frame': 'odom',
+            'base_frame': 'base_link',
         }],
-        remappings=[
-            ('/cmd_vel', '/cmd_vel_nav'),
-        ],
         condition=IfCondition(LaunchConfiguration('use_fake_base'))
     )
 
@@ -301,6 +333,10 @@ def generate_launch_description():
         use_rviz_arg,
         use_localization_arg,
         use_map_server_arg,
+        auto_coverage_arg,
+        start_x_arg,
+        start_y_arg,
+        start_yaw_arg,
 
         nav2_bringup_launch,
         nav2_navigation_launch,

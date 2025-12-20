@@ -4,6 +4,7 @@ import math
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSReliabilityPolicy
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import PoseStamped
 from nav2_msgs.action import NavigateThroughPoses
@@ -27,32 +28,32 @@ class CoverageWaypoints(Node):
         self.keepout = self.get_parameter('keepout_cells').value
         self.frame_id = self.get_parameter('frame_id').value
 
+        # ✅ 使用 transient_local QoS 匹配 map_server 的 latched 地图
+        qos = QoSProfile(depth=1)
+        qos.reliability = QoSReliabilityPolicy.RELIABLE
+        qos.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
+
         self.map_sub = self.create_subscription(
-            OccupancyGrid, '/map', self.map_callback, 10)
+            OccupancyGrid, '/map', self.map_callback, qos)
 
         self.client = ActionClient(
             self, NavigateThroughPoses, '/navigate_through_poses')
 
         self.map = None
         self.sent = False
+        self.poses = None
+
+        # 定时器：等 Nav2 ready 后发送目标
+        self.timer = self.create_timer(1.0, self.try_send)
 
         self.get_logger().info(
             'CoverageWaypoints node started, waiting for map...')
 
     def map_callback(self, msg: OccupancyGrid):
-        if self.sent:
-            return
-
         self.map = msg
-        poses = self.generate_waypoints(msg)
-
-        if not poses:
-            self.get_logger().error('No valid waypoints generated.')
-            return
-
-        self.get_logger().info(f'Generated {len(poses)} coverage waypoints')
-        self.send_goal(poses)
-        self.sent = True
+        if self.poses is None:
+            self.poses = self.generate_waypoints(msg)
+            self.get_logger().info(f'Generated {len(self.poses)} coverage waypoints (cached).')
 
     def generate_waypoints(self, msg: OccupancyGrid):
         info = msg.info
@@ -60,15 +61,16 @@ class CoverageWaypoints(Node):
 
         w, h = info.width, info.height
         res = info.resolution
-        ox, oy = info.origin.position.x, info.origin.position.y
+        ox = info.origin.position.x
+        oy = info.origin.position.y
 
         step_cells = max(1, int(self.step_m / res))
         k = self.keepout
 
         poses = []
         direction = 1
-
         y = k
+
         while y < h - k:
             xs = range(k, w - k, step_cells)
             if direction < 0:
@@ -84,9 +86,7 @@ class CoverageWaypoints(Node):
                     pose.header.frame_id = self.frame_id
                     pose.pose.position.x = mx
                     pose.pose.position.y = my
-                    q = yaw_to_quat(0.0 if direction > 0 else math.pi)
-                    pose.pose.orientation.z = q[2]
-                    pose.pose.orientation.w = q[3]
+                    pose.pose.orientation.w = 1.0
 
                     poses.append(pose)
                     row_has_point = True
@@ -95,6 +95,7 @@ class CoverageWaypoints(Node):
                 direction *= -1
             y += step_cells
 
+        # ✅ return 一定要在函数里面
         return poses
 
     def is_safe(self, data, x, y, w, h, k):
@@ -107,17 +108,45 @@ class CoverageWaypoints(Node):
                     return False
         return True
 
-    def send_goal(self, poses):
-        if not self.client.wait_for_server(timeout_sec=10.0):
-            self.get_logger().error(
-                'navigate_through_poses action not available')
+    def try_send(self):
+        if self.sent:
+            return
+        if self.map is None or self.poses is None or len(self.poses) == 0:
             return
 
+        # 等 action server ready
+        if not self.client.wait_for_server(timeout_sec=0.1):
+            self.get_logger().debug('Waiting for /navigate_through_poses action server...')
+            return
+
+        self.get_logger().info('Nav2 ready, sending coverage goal...')
+        self.send_goal(self.poses)
+        self.sent = True
+
+    def send_goal(self, poses):
         goal = NavigateThroughPoses.Goal()
         goal.poses = poses
 
-        self.get_logger().info('Sending coverage path to Nav2...')
-        self.client.send_goal_async(goal)
+        send_future = self.client.send_goal_async(goal)
+        send_future.add_done_callback(self.goal_response_callback)
+
+    def goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().error('Coverage goal rejected, will retry.')
+            self.sent = False
+            return
+
+        self.get_logger().info('Coverage goal accepted.')
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self.result_callback)
+
+    def result_callback(self, future):
+        status = future.result().status
+        self.get_logger().info(f'Coverage finished with status={status}')
+        if status != 4:  # 4=SUCCEEDED（Humble里一般这样）
+            self.get_logger().warn('Coverage not succeeded, allow retry.')
+            self.sent = False
 
 
 def main():
